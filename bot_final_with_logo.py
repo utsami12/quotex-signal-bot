@@ -20,14 +20,14 @@ licenses = {
 signal_history = {}
 TOKEN = "7451263167:AAFnyBX7S5YiiOBawsGuzy12keb-uyBe2R0"
 
-# ✅ Timezone fix
+# ✅ Bangladesh Local Time
 def get_local_time():
     utc_now = datetime.utcnow()
     bd_timezone = pytz.timezone("Asia/Dhaka")
     local_time = utc_now.astimezone(bd_timezone)
     return local_time.strftime("%H:%M")
 
-# ✅ Asset format fix
+# ✅ Asset Name Format
 def format_asset_name(asset_text):
     try:
         asset, suffix = asset_text.split(" - ")
@@ -86,19 +86,27 @@ def get_market_type():
 
 # 🚀 Signal generator
 def generate_signal(user_id):
-    entry_time = get_local_time()
+    if user_id in signal_history:
+        return "⚠️ A signal is already active. Wait until current signal is complete."
+
+    now = datetime.utcnow()
+    bd_timezone = pytz.timezone("Asia/Dhaka")
+    entry_time = (now + timedelta(minutes=1)).astimezone(bd_timezone).strftime("%H:%M")
+
     asset_raw = random.choice(assets_otc)
     asset = format_asset_name(asset_raw)
+
     signal = {
         "asset": asset,
         "direction": random.choice(["CALL", "PUT"]),
         "entry_time": entry_time,
         "duration": "1 Minute",
         "market": get_market_type(),
-        "strategy": "RSI + MACD",
+        "strategy": "Use martingale 1 step",
         "confidence": f"{random.randint(85, 95)}%"
     }
     signal_history[user_id] = signal
+
     return (
         f"🚀 Quotex Trading Signal\n━━━━━━━━━━━━━━━━━\n"
         f"📍 Asset: {signal['asset']}\n"
@@ -106,7 +114,7 @@ def generate_signal(user_id):
         f"🕒 Entry Time: {signal['entry_time']}\n"
         f"⏳ Duration: {signal['duration']}\n"
         f"🏷️ Market: {signal['market']}\n"
-        f"📊 Strategy: {signal['strategy']}\n"
+        f"🛠️ {signal['strategy']}\n"
         f"🎯 Confidence: {signal['confidence']}\n"
         f"━━━━━━━━━━━━━━━━━\n✅ Status: Prepare to Enter"
     )
@@ -116,6 +124,8 @@ def signal_result(user_id):
     signal = signal_history.get(user_id)
     if not signal:
         return "❌ No signal found."
+    signal_history.pop(user_id)  # Clear signal after result
+
     return (
         f"📊 Signal Result\n━━━━━━━━━━━━━━━━━\n"
         f"📍 Asset: {signal['asset']}\n"
