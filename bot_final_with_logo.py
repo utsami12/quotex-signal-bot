@@ -16,18 +16,20 @@ licenses = {
     "silent": {}
 }
 
-# Signal storage
+# Signal storage: {user_id: {"signal": {...}, "expires": datetime}}
 signal_history = {}
+
+# ✅ Bot Token (Inline)
 TOKEN = "7451263167:AAFnyBX7S5YiiOBawsGuzy12keb-uyBe2R0"
 
 # ✅ Bangladesh Local Time
-def get_local_time():
-    utc_now = datetime.utcnow()
+def get_local_time(dt=None):
+    if not dt:
+        dt = datetime.utcnow()
     bd_timezone = pytz.timezone("Asia/Dhaka")
-    local_time = utc_now.astimezone(bd_timezone)
-    return local_time.strftime("%H:%M")
+    return dt.astimezone(bd_timezone)
 
-# ✅ Asset Name Format
+# ✅ Asset Formatter
 def format_asset_name(asset_text):
     try:
         asset, suffix = asset_text.split(" - ")
@@ -59,7 +61,7 @@ def validate_license(user_id, license_key):
             return True, "✅ Silent License activated for 20 minutes."
     return False, "🚫 Invalid license."
 
-# ⏲️ Check access
+# ✅ Check Access
 def has_access(user_id):
     now = datetime.now()
     for key in ["sami", "tareq"]:
@@ -69,7 +71,7 @@ def has_access(user_id):
         return now < licenses["silent"][user_id]
     return False
 
-# 💹 Asset list (OTC version)
+# 📊 Asset List (OTC)
 assets_otc = [
     "EUR/USD - OTC", "GBP/USD - OTC", "USD/JPY - OTC", "AUD/USD - OTC", "USD/CAD - OTC",
     "NZD/USD - OTC", "EUR/JPY - OTC", "GBP/JPY - OTC", "EUR/CHF - OTC", "USD/CHF - OTC",
@@ -79,20 +81,21 @@ assets_otc = [
     "BRL/USD - OTC", "ARS/USD - OTC", "DZD/USD - OTC", "INR/USD - OTC", "EUR/SGD - OTC"
 ]
 
-# 🧭 Get market type
+# ✅ Market Type
 def get_market_type():
     day = datetime.now().strftime("%A")
     return "OTC" if day in ["Saturday", "Sunday"] else "Real Market"
 
-# 🚀 Signal generator
+# 🚀 Generate Signal
 def generate_signal(user_id):
+    now = get_local_time()
+
+    # Check if previous signal still active
     if user_id in signal_history:
-        return "⚠️ A signal is already active. Wait until current signal is complete."
+        if signal_history[user_id]["expires"] > now:
+            return "⚠️ A signal is already active. Please wait until it expires."
 
-    now = datetime.utcnow()
-    bd_timezone = pytz.timezone("Asia/Dhaka")
-    entry_time = (now + timedelta(minutes=1)).astimezone(bd_timezone).strftime("%H:%M")
-
+    entry_time = (now + timedelta(minutes=1)).strftime("%H:%M")
     asset_raw = random.choice(assets_otc)
     asset = format_asset_name(asset_raw)
 
@@ -105,7 +108,9 @@ def generate_signal(user_id):
         "strategy": "Use martingale 1 step",
         "confidence": f"{random.randint(85, 95)}%"
     }
-    signal_history[user_id] = signal
+
+    expires_at = now + timedelta(minutes=2)
+    signal_history[user_id] = {"signal": signal, "expires": expires_at}
 
     return (
         f"🚀 Quotex Trading Signal\n━━━━━━━━━━━━━━━━━\n"
@@ -119,41 +124,20 @@ def generate_signal(user_id):
         f"━━━━━━━━━━━━━━━━━\n✅ Status: Prepare to Enter"
     )
 
-# 📈 Signal result
-def signal_result(user_id):
-    signal = signal_history.get(user_id)
-    if not signal:
-        return "❌ No signal found."
-    signal_history.pop(user_id)  # Clear signal after result
-
-    return (
-        f"📊 Signal Result\n━━━━━━━━━━━━━━━━━\n"
-        f"📍 Asset: {signal['asset']}\n"
-        f"📈 Direction: {signal['direction']}\n"
-        f"🕒 Entry Time: {signal['entry_time']}\n"
-        f"⏳ Duration: {signal['duration']}\n"
-        f"🏷️ Market: {signal['market']}\n"
-        f"✅ Outcome: WIN (Demo)\n"
-        f"📈 Entry Price: 1.10100\n"
-        f"📉 Expiry Price: 1.10180\n"
-        f"🎯 Confidence: {signal['confidence']}\n━━━━━━━━━━━━━━━━━"
-    )
-
-# 📊 Performance
+# 📊 Performance Display
 def get_performance():
     return "📊 Bot Performance\n✅ Wins: 8\n❌ Losses: 2\n🎯 Accuracy: 80%"
 
-# 🎛️ Main menu
+# 🎛️ Menu (Signal Result Removed)
 async def show_menu(update, context):
     keyboard = [
         [KeyboardButton("🚀 GENERATE SIGNAL")],
-        [KeyboardButton("📈 Signal Result"), KeyboardButton("🗂️ Signal History")],
         [KeyboardButton("📊 Performance"), KeyboardButton("🌐 OTC Market"), KeyboardButton("📉 Real Market")]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
     await context.bot.send_message(chat_id=update.effective_chat.id, text="🧭 Choose an option:", reply_markup=reply_markup)
 
-# 🔰 Start + License flow
+# 🔰 Main Message Handler
 async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip().lower()
@@ -167,8 +151,6 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if text == "🚀 generate signal":
         await update.message.reply_text(generate_signal(user_id))
-    elif text == "📈 signal result":
-        await update.message.reply_text(signal_result(user_id))
     elif text == "📊 performance":
         await update.message.reply_text(get_performance())
     elif text == "🗂️ signal history":
@@ -178,7 +160,7 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     else:
         await update.message.reply_text("🔐 Send your license key to activate the bot.")
 
-# 🚀 Launch bot
+# 🟢 Run Bot
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT, handle_user_message))
