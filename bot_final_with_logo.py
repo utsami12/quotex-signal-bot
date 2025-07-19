@@ -2,6 +2,7 @@ import logging
 from telegram import ReplyKeyboardMarkup, KeyboardButton, Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from datetime import datetime, timedelta
+import pytz
 import random
 
 # Logging setup
@@ -18,6 +19,24 @@ licenses = {
 # Signal storage
 signal_history = {}
 TOKEN = "7451263167:AAFnyBX7S5YiiOBawsGuzy12keb-uyBe2R0"
+
+# ✅ Timezone fix
+def get_local_time():
+    utc_now = datetime.utcnow()
+    bd_timezone = pytz.timezone("Asia/Dhaka")
+    local_time = utc_now.astimezone(bd_timezone)
+    return local_time.strftime("%H:%M")
+
+# ✅ Asset format fix
+def format_asset_name(asset_text):
+    try:
+        asset, suffix = asset_text.split(" - ")
+        parts = asset.split("/")
+        if parts[1] == "USD":
+            asset = f"USD/{parts[0]}"
+        return f"{asset} - {suffix}"
+    except:
+        return asset_text
 
 # ✅ Validate License
 def validate_license(user_id, license_key):
@@ -67,8 +86,9 @@ def get_market_type():
 
 # 🚀 Signal generator
 def generate_signal(user_id):
-    entry_time = (datetime.now() + timedelta(minutes=1)).strftime("%H:%M")
-    asset = random.choice(assets_otc)
+    entry_time = get_local_time()
+    asset_raw = random.choice(assets_otc)
+    asset = format_asset_name(asset_raw)
     signal = {
         "asset": asset,
         "direction": random.choice(["CALL", "PUT"]),
@@ -128,7 +148,6 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_id = update.effective_user.id
     text = update.message.text.strip().lower()
 
-    # If user doesn't have access
     if not has_access(user_id):
         success, msg = validate_license(user_id, text)
         await update.message.reply_text(msg)
@@ -136,7 +155,6 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             await show_menu(update, context)
         return
 
-    # Button handling
     if text == "🚀 generate signal":
         await update.message.reply_text(generate_signal(user_id))
     elif text == "📈 signal result":
