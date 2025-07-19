@@ -16,31 +16,39 @@ licenses = {
     "silent": {}
 }
 
-# Signal storage: {user_id: {"signal": {...}, "expires": datetime}}
+# Signal storage: user_id → {"signal": {...}, "expires": datetime}
 signal_history = {}
 
-# ✅ Bot Token (Inline)
+# ✅ Telegram Bot Token
 TOKEN = "7451263167:AAFnyBX7S5YiiOBawsGuzy12keb-uyBe2R0"
 
-# ✅ Bangladesh Local Time
+# ✅ Bangladesh Local Time Converter
 def get_local_time(dt=None):
     if not dt:
         dt = datetime.utcnow()
-    bd_timezone = pytz.timezone("Asia/Dhaka")
-    return dt.astimezone(bd_timezone)
+    tz = pytz.timezone("Asia/Dhaka")
+    return dt.astimezone(tz)
 
-# ✅ Asset Formatter
-def format_asset_name(asset_text):
-    try:
-        asset, suffix = asset_text.split(" - ")
-        parts = asset.split("/")
-        if parts[1] == "USD":
-            asset = f"USD/{parts[0]}"
-        return f"{asset} - {suffix}"
-    except:
-        return asset_text
+# ✅ OTC Asset List (Verified from Quotex)
+assets_otc = [
+    # Forex OTC
+    "EUR/USD - OTC", "GBP/USD - OTC", "USD/JPY - OTC", "AUD/USD - OTC", "USD/CAD - OTC",
+    "NZD/USD - OTC", "EUR/JPY - OTC", "GBP/JPY - OTC", "EUR/CHF - OTC", "USD/CHF - OTC",
+    "EUR/AUD - OTC", "GBP/AUD - OTC", "AUD/JPY - OTC", "AUD/CHF - OTC", "NZD/JPY - OTC",
+    "NZD/CHF - OTC", "CAD/CHF - OTC", "EUR/CAD - OTC", "GBP/CAD - OTC", "CHF/JPY - OTC",
+    "USD/TRY - OTC", "USD/MXN - OTC", "USD/PKR - OTC", "USD/COP - OTC", "USD/BDT - OTC",
+    "USD/BRL - OTC", "USD/ARS - OTC", "USD/DZD - OTC", "USD/INR - OTC", "EUR/SGD - OTC",
+    "NZD/CAD - OTC", "GBP/CHF - OTC",
+    # Crypto OTC
+    "BTC/USD - OTC", "ETH/USD - OTC", "XRP/USD - OTC", "DOGE/USD - OTC", "LTC/USD - OTC",
+    # Commodities OTC
+    "Gold/USD - OTC", "Silver/USD - OTC", "Oil/USD - OTC", "Brent/USD - OTC", "Copper/USD - OTC",
+    # Stocks OTC
+    "Microsoft - OTC", "Pfizer - OTC", "Boeing - OTC", "Intel - OTC", "McDonald’s - OTC",
+    "Johnson & Johnson - OTC", "American Express - OTC", "Facebook - OTC"
+]
 
-# ✅ Validate License
+# ✅ License Validation
 def validate_license(user_id, license_key):
     now = datetime.now()
     if license_key in ["sami", "tareq"]:
@@ -61,7 +69,7 @@ def validate_license(user_id, license_key):
             return True, "✅ Silent License activated for 20 minutes."
     return False, "🚫 Invalid license."
 
-# ✅ Check Access
+# ✅ Access Check
 def has_access(user_id):
     now = datetime.now()
     for key in ["sami", "tareq"]:
@@ -71,33 +79,21 @@ def has_access(user_id):
         return now < licenses["silent"][user_id]
     return False
 
-# 📊 Asset List (OTC)
-assets_otc = [
-    "EUR/USD - OTC", "GBP/USD - OTC", "USD/JPY - OTC", "AUD/USD - OTC", "USD/CAD - OTC",
-    "NZD/USD - OTC", "EUR/JPY - OTC", "GBP/JPY - OTC", "EUR/CHF - OTC", "USD/CHF - OTC",
-    "EUR/AUD - OTC", "GBP/AUD - OTC", "AUD/JPY - OTC", "AUD/CHF - OTC", "NZD/JPY - OTC",
-    "NZD/CHF - OTC", "CAD/CHF - OTC", "EUR/CAD - OTC", "GBP/CAD - OTC", "CHF/JPY - OTC",
-    "USD/TRY - OTC", "USD/MXN - OTC", "USD/PKR - OTC", "USD/COP - OTC", "USD/BDT - OTC",
-    "BRL/USD - OTC", "ARS/USD - OTC", "DZD/USD - OTC", "INR/USD - OTC", "EUR/SGD - OTC"
-]
-
-# ✅ Market Type
+# ✅ Weekend Market Checker
 def get_market_type():
-    day = datetime.now().strftime("%A")
-    return "OTC" if day in ["Saturday", "Sunday"] else "Real Market"
+    return "OTC" if datetime.now().strftime("%A") in ["Saturday", "Sunday"] else "Real Market"
 
-# 🚀 Generate Signal
+# 🚀 Signal Generator
 def generate_signal(user_id):
     now = get_local_time()
 
-    # Check if previous signal still active
+    # Prevent duplicate signal during active period
     if user_id in signal_history:
         if signal_history[user_id]["expires"] > now:
             return "⚠️ A signal is already active. Please wait until it expires."
 
+    asset = random.choice(assets_otc)
     entry_time = (now + timedelta(minutes=1)).strftime("%H:%M")
-    asset_raw = random.choice(assets_otc)
-    asset = format_asset_name(asset_raw)
 
     signal = {
         "asset": asset,
@@ -109,8 +105,8 @@ def generate_signal(user_id):
         "confidence": f"{random.randint(85, 95)}%"
     }
 
-    expires_at = now + timedelta(minutes=2)
-    signal_history[user_id] = {"signal": signal, "expires": expires_at}
+    expires = now + timedelta(minutes=2)
+    signal_history[user_id] = {"signal": signal, "expires": expires}
 
     return (
         f"🚀 Quotex Trading Signal\n━━━━━━━━━━━━━━━━━\n"
@@ -124,43 +120,43 @@ def generate_signal(user_id):
         f"━━━━━━━━━━━━━━━━━\n✅ Status: Prepare to Enter"
     )
 
-# 📊 Performance Display
+# 📊 Bot Performance
 def get_performance():
     return "📊 Bot Performance\n✅ Wins: 8\n❌ Losses: 2\n🎯 Accuracy: 80%"
 
-# 🎛️ Menu (Signal Result Removed)
+# 🎛️ Main Menu (without Signal Result)
 async def show_menu(update, context):
     keyboard = [
         [KeyboardButton("🚀 GENERATE SIGNAL")],
         [KeyboardButton("📊 Performance"), KeyboardButton("🌐 OTC Market"), KeyboardButton("📉 Real Market")]
     ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="🧭 Choose an option:", reply_markup=reply_markup)
+    markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="🧭 Choose an option:", reply_markup=markup)
 
-# 🔰 Main Message Handler
+# 🔰 Message Handler
 async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    text = update.message.text.strip().lower()
+    msg = update.message.text.strip().lower()
 
     if not has_access(user_id):
-        success, msg = validate_license(user_id, text)
-        await update.message.reply_text(msg)
-        if success:
+        ok, response = validate_license(user_id, msg)
+        await update.message.reply_text(response)
+        if ok:
             await show_menu(update, context)
         return
 
-    if text == "🚀 generate signal":
+    if msg == "🚀 generate signal":
         await update.message.reply_text(generate_signal(user_id))
-    elif text == "📊 performance":
+    elif msg == "📊 performance":
         await update.message.reply_text(get_performance())
-    elif text == "🗂️ signal history":
+    elif msg == "🗂️ signal history":
         await update.message.reply_text("📂 History coming soon...")
-    elif text in ["🌐 otc market", "📉 real market"]:
-        await update.message.reply_text(f"✅ Market Selected: {text.title()}")
+    elif msg in ["🌐 otc market", "📉 real market"]:
+        await update.message.reply_text(f"✅ Market Selected: {msg.title()}")
     else:
         await update.message.reply_text("🔐 Send your license key to activate the bot.")
 
-# 🟢 Run Bot
+# 🚀 Launch Bot
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT, handle_user_message))
